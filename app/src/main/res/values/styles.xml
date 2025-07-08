@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Estilo para los chips de filtro -->
+    <style name="CustomChipStyle" parent="Widget.MaterialComponents.Chip.Choice">
+        <item name="chipBackgroundColor">@color/chip_background_color</item>
+        <item name="android:textColor">@color/chip_text_color</item>
+        <item name="chipCornerRadius">16dp</item>
+        <item name="chipStrokeWidth">0dp</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+    </style>    <!-- Estilo personalizado para la barra de progreso horizontal -->
+    <style name="CustomHorizontalProgressBar" parent="Widget.AppCompat.ProgressBar.Horizontal">
+        <item name="android:progressTint">@android:color/white</item>
+        <item name="android:progressBackgroundTint">#80FFFFFF</item>
+        <item name="android:minHeight">8dp</item>
+        <item name="android:maxHeight">8dp</item>
+        <item name="android:indeterminateTint">@android:color/white</item>
+    </style>
+
+    <!-- Estilo mejorado para la barra de progreso del splash -->
+    <style name="CustomHorizontalProgressBarPurple" parent="Widget.AppCompat.ProgressBar.Horizontal">
+        <item name="android:progressTint">@color/splash_gold</item>
+        <item name="android:progressBackgroundTint">#40FFFFFF</item>
+        <item name="android:minHeight">8dp</item>
+        <item name="android:maxHeight">8dp</item>
+        <item name="android:indeterminateTint">@color/splash_gold</item>
+    </style>
+</resources>

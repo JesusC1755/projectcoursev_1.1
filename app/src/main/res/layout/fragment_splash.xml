@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/splash_background_spectacular"
+    tools:context=".ui.SplashFragment">    <!-- Logo Principal con animación -->
+    <ImageView
+        android:id="@+id/splashLogo"
+        android:layout_width="140dp"
+        android:layout_height="140dp"
+        android:background="@drawable/logo_background_purple"
+        android:padding="20dp"
+        android:src="@drawable/ic_book_spectacular"
+        android:visibility="visible"
+        android:scaleX="0"
+        android:scaleY="0"
+        android:alpha="0"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.35"
+        android:contentDescription="@string/app_logo" />
+
+    <!-- Container para las letras animadas del título -->
+    <LinearLayout
+        android:id="@+id/titleContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:orientation="horizontal"
+        android:gravity="center"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/splashLogo">
+
+        <TextView
+            android:id="@+id/letter_t"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="T"
+            android:textColor="@android:color/white"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-black"
+            android:alpha="0"
+            android:translationY="50dp"
+            android:elevation="8dp"
+            android:shadowColor="#AA000000"
+            android:shadowDx="2"
+            android:shadowDy="2"
+            android:shadowRadius="4" />
+
+        <TextView
+            android:id="@+id/letter_a1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="a"
+            android:textColor="@android:color/white"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-black"
+            android:alpha="0"
+            android:translationY="50dp"
+            android:elevation="8dp"
+            android:shadowColor="#AA000000"
+            android:shadowDx="2"
+            android:shadowDy="2"
+            android:shadowRadius="4" />
+
+        <TextView
+            android:id="@+id/letter_r"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="r"
+            android:textColor="@android:color/white"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-black"
+            android:alpha="0"
+            android:translationY="50dp"
+            android:elevation="8dp"
+            android:shadowColor="#AA000000"
+            android:shadowDx="2"
+            android:shadowDy="2"  
+            android:shadowRadius="4" />
+
+        <TextView
+            android:id="@+id/letter_e1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="e"
+            android:textColor="@android:color/white"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-black"
+            android:alpha="0"
+            android:translationY="50dp"
+            android:elevation="8dp"
+            android:shadowColor="#AA000000"
+            android:shadowDx="2"
+            android:shadowDy="2"
+            android:shadowRadius="4" />
+
+        <TextView
+            android:id="@+id/letter_a2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="a"
+            android:textColor="@android:color/white"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-black"
+            android:alpha="0"
+            android:translationY="50dp"
+            android:elevation="8dp"
+            android:shadowColor="#AA000000"
+            android:shadowDx="2"
+            android:shadowDy="2"
+            android:shadowRadius="4" />
+
+        <TextView
+            android:id="@+id/letter_m"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="M"
+            android:textColor="#FFD700"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-black"
+            android:alpha="0"
+            android:translationY="50dp"
+            android:elevation="8dp"
+            android:shadowColor="#AA000000"
+            android:shadowDx="2"
+            android:shadowDy="2"
+            android:shadowRadius="4" />
+
+        <TextView
+            android:id="@+id/letter_o"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="o"
+            android:textColor="#FFD700"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-black"
+            android:alpha="0"
+            android:translationY="50dp"
+            android:elevation="8dp"
+            android:shadowColor="#AA000000"
+            android:shadowDx="2"
+            android:shadowDy="2"
+            android:shadowRadius="4" />
+
+        <TextView
+            android:id="@+id/letter_v"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="v"
+            android:textColor="#FFD700"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-black"
+            android:alpha="0"
+            android:translationY="50dp"
+            android:elevation="8dp"
+            android:shadowColor="#AA000000"
+            android:shadowDx="2"
+            android:shadowDy="2"
+            android:shadowRadius="4" />
+
+    </LinearLayout>    <!-- Barra de progreso estilizada -->
+    <ProgressBar
+        android:id="@+id/loadingProgressBar"
+        style="@style/CustomHorizontalProgressBarPurple"
+        android:layout_width="280dp"
+        android:layout_height="8dp"
+        android:layout_marginTop="40dp"
+        android:alpha="0"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/titleContainer" />
+
+    <!-- Texto de carga con efectos -->
+    <TextView
+        android:id="@+id/loadingTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="@string/loading_text"
+        android:textColor="#E6FFFFFF"
+        android:textSize="16sp"
+        android:fontFamily="sans-serif-medium"
+        android:alpha="0"
+        android:elevation="4dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/loadingProgressBar" />    <!-- Partículas flotantes animadas -->
+    <ImageView
+        android:id="@+id/particle1"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:src="@drawable/ic_sparkle"
+        android:tint="#FFD700"
+        android:alpha="0"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.15"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.25"
+        android:contentDescription="@string/decorative_particle" />
+
+    <ImageView
+        android:id="@+id/particle2"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:src="@drawable/ic_star"
+        android:tint="#BB86FC"
+        android:alpha="0"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.85"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.20"
+        android:contentDescription="@string/decorative_particle" />
+
+    <ImageView
+        android:id="@+id/particle3"
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:src="@drawable/ic_diamond"
+        android:tint="#CF6679"
+        android:alpha="0"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.25"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.70"
+        android:contentDescription="@string/decorative_particle" />
+
+    <ImageView
+        android:id="@+id/particle4"
+        android:layout_width="14dp"
+        android:layout_height="14dp"
+        android:src="@drawable/ic_circle"
+        android:tint="#03DAC6"
+        android:alpha="0"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.75"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.75"
+        android:contentDescription="@string/decorative_particle" />
+
+    <!-- Elementos decorativos mejorados -->
+    <ImageView
+        android:id="@+id/decorIcon1"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:src="@drawable/ic_book_open"
+        android:tint="#E6FFFFFF"
+        android:alpha="0"
+        android:elevation="6dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.1"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.45"
+        android:contentDescription="@string/decorative_icon" />
+
+    <ImageView
+        android:id="@+id/decorIcon2"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:src="@drawable/ic_lightbulb"
+        android:tint="#E6FFFFFF"
+        android:alpha="0"
+        android:elevation="6dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.9"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.55"
+        android:contentDescription="@string/decorative_icon" />
+
+    <ImageView
+        android:id="@+id/decorIcon3"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:src="@drawable/ic_award"
+        android:tint="#E6FFFFFF"
+        android:alpha="0"
+        android:elevation="6dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.15"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.80"
+        android:contentDescription="@string/decorative_icon" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

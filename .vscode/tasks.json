@@ -1,0 +1,14 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Android App",
+			"type": "shell",
+			"command": "cd c:\\Users\\yasuy\\AndroidStudioProjects\\cueto_tarea && gradlew.bat :app:assembleDebug",
+			"group": "build",
+			"problemMatcher": [
+				"$tsc"
+			]
+		}
+	]
+}

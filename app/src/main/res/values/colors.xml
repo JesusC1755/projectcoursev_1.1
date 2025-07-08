@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_primary">#6200EE</color>
+    <color name="purple_light">#8E24AA</color>
+    <color name="purple_dark">#4A148C</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="gray_light">#F5F5F5</color>
+    <color name="gray_text">#757575</color>
+    <color name="gray_dark">#333333</color>
+    <color name="colorPrimary">#3F51B5</color>
+    <color name="colorPrimaryDark">#303F9F</color>
+    <color name="colorAccent">#FF4081</color>
+    <color name="colorTextPrimary">#212121</color>
+    <color name="colorTextSecondary">#757575</color>
+    <color name="red_600">#E53935</color>
+    <color name="red_700">#D32F2F</color>
+    <color name="gray_800">#1A1A1A</color>
+    <color name="gray_900">#121212</color>
+    <color name="yellow_900">#F57F17</color>
+    <color name="green_900">#1B5E20</color>
+
+    <!-- Colores para los chips -->
+    <color name="chip_selected">#FFFFFF</color>
+    <color name="chip_unselected">#E0E0E0</color>
+    <color name="chip_text_selected">#6200EE</color>
+    <color name="chip_text_unselected">#757575</color>
+
+    <!-- Material Design default colors -->
+    <color name="purple_500">#9C27B0</color>
+    <color name="red">#FF3B30</color>
+    
+    <!-- Splash Screen Colors -->
+    <color name="splash_purple_primary">#6A1B9A</color>
+    <color name="splash_purple_dark">#4A148C</color>
+    <color name="splash_purple_light">#9C27B0</color>
+    <color name="splash_gold">#FFD700</color>
+    <color name="splash_cyan">#03DAC6</color>
+    <color name="splash_pink">#CF6679</color>
+    <color name="material_purple">#BB86FC</color>
+    <color name="purple_background">#6A1B9A</color>
+</resources>
