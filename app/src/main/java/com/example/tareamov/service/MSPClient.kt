@@ -12,6 +12,8 @@ import java.io.OutputStreamWriter
 import java.net.ConnectException
 import java.net.HttpURLConnection
 import java.net.URL
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 
 /**
  * Client for interacting with the Model Serving Platform (MSP)
@@ -19,61 +21,86 @@ import java.net.URL
  */
 class MSPClient(private val context: Context) {
     private val tag = "MSPClient"
-    // Lista de IPs posibles (vieja y nueva)
+    // Lista de IPs posibles (ordenadas por prioridad)
     private val possibleBaseUrls = listOf(
-        "http://192.168.1.18:11434",   // IP vieja
-        "http://192.168.1.158:11434",  // IP nueva
-        "http://108.100.101.86:11434", // IP actual
-        "http://192.168.71.181:11434", // IP nueva WiFi
-        "http://108.100.108.200:11434", // IP nueva obtenida de ipconfig
-        "http://192.168.81.181:11434",  // Nueva IP de ipconfig
-        "http://108.100.105.159:11434", // Nueva IP WiFi de ipconfig
-        "http://192.168.46.181:11434",  // Nueva IP WiFi de Windows
-        "http://108.100.102.65:11434",  // Nueva IP de Windows (agregada)
-        "http://192.168.10.95:11434",   // Nueva IP Wi-Fi
-        "http://192.168.249.181:11434", // <-- Nueva IP agregada de ipconfig
-        "http://172.20.10.4:11434",     // Otra IP agregada de ipconfig
-        "http://192.168.1.17:11434",    // <-- NUEVA IP AGREGADA (Wi-Fi Windows)
-        "http://192.168.1.7:11434",      // <-- NUEVA IP AGREGADA (Wi-Fi actual)
-        "http://192.168.1.15:11434"
+        "http://192.168.1.158:11435",   // Current IP from ipconfig - Highest priority
+        "http://localhost:11435",       // Localhost - High priority
+        "http://127.0.0.1:11435",       // Loopback - High priority
+        "http://0.0.0.0:11435",         // Bind address from Ollama logs
+        "http://172.17.112.1:11435",    // WSL IP from ipconfig
+        "http://192.168.1.254:11435"    // Gateway IP from ipconfig
     )
-    private val emulatorUrl = "http://10.0.2.2:11434"
+    private val emulatorUrl = "http://10.0.2.2:11435"
     private val modelName = "llama3"
+
+    // Enhanced OkHttpClient with better timeout handling for large payloads
+    private val client by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)  // Increased read timeout for large responses
+            .writeTimeout(60, TimeUnit.SECONDS)  // Increased write timeout for large requests
+            .build()
+    }
 
     private fun getBaseUrl(): String {
         if (isEmulator()) {
             Log.d(tag, "Using emulator URL: $emulatorUrl")
             return emulatorUrl
         }
-        // Probar cada IP hasta que una responda
-        for (url in possibleBaseUrls) {
+        
+        // Always try the current IP first (from ipconfig)
+        if (isServerRunning("http://192.168.1.158:11435")) {
+            Log.d(tag, "Connected to Ollama at current IP URL: http://192.168.1.158:11435")
+            return "http://192.168.1.158:11435"
+        }
+        
+        // Try each other URL in order of priority
+        for (url in possibleBaseUrls.drop(1)) { // Skip the first one as we already tried it
             if (isServerRunning(url)) {
-                Log.d(tag, "Using available base URL: $url")
+                Log.d(tag, "Connected to Ollama at URL: $url")
                 return url
             }
         }
-        // Si ninguna responde, usar la primera por defecto
-        Log.w(tag, "No Ollama server available, using default: ${possibleBaseUrls.first()}")
-        return possibleBaseUrls.first()
+        
+        // If none respond, use the current IP as fallback for future attempts
+        Log.w(tag, "No Ollama server found, using current IP as fallback")
+        return "http://192.168.1.158:11435"
     }
 
-    // Cambia isServerRunning para aceptar un parámetro opcional de URL
+    // Improved server running check with better connection handling
     fun isServerRunning(urlToCheck: String? = null): Boolean {
         val url = urlToCheck ?: getBaseUrl()
         Log.d(tag, "Checking server status at: $url/api/tags")
+        var connection: HttpURLConnection? = null
+        
         return try {
             val urlObj = URL("$url/api/tags")
-            val connection = urlObj.openConnection() as HttpURLConnection
+            connection = urlObj.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
-            connection.connectTimeout = 5000
+            connection.connectTimeout = 5000  // Increased timeout for more reliable checking
+            connection.readTimeout = 5000     // Increased timeout for more reliable checking
             connection.connect()
+            
             val responseCode = connection.responseCode
-            Log.d(tag, "Server check response code: $responseCode")
-            connection.disconnect()
-            responseCode == HttpURLConnection.HTTP_OK
+            Log.d(tag, "Server check response code: $responseCode for $url")
+            val isOk = responseCode == HttpURLConnection.HTTP_OK
+            
+            if (isOk) {
+                Log.i(tag, "Successfully connected to Ollama server at $url")
+            } else {
+                Log.w(tag, "Server at $url returned non-OK response: $responseCode")
+            }
+            
+            isOk
         } catch (e: Exception) {
-            Log.e(tag, "No se pudo conectar al servidor Ollama en $url. Detalle: ${e.message}")
+            Log.e(tag, "Failed to connect to Ollama server at $url: ${e.message}")
             false
+        } finally {
+            try {
+                connection?.disconnect()
+            } catch (e: Exception) {
+                Log.e(tag, "Error disconnecting from $url", e)
+            }
         }
     }
 
@@ -107,25 +134,6 @@ class MSPClient(private val context: Context) {
         }
     }
 
-    fun isServerRunning(): Boolean {
-        val urlToCheck = getBaseUrl()
-        Log.d(tag, "Checking server status at: $urlToCheck/api/tags")
-        return try {
-            val url = URL("$urlToCheck/api/tags")
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 5000
-            connection.connect()
-            val responseCode = connection.responseCode
-            Log.d(tag, "Server check response code: $responseCode")
-            connection.disconnect()
-            responseCode == HttpURLConnection.HTTP_OK
-        } catch (e: Exception) {
-            Log.e(tag, "No se pudo conectar al servidor Ollama en $urlToCheck. Se usará el modelo local. Detalle: ${e.message}")
-            false
-        }
-    }
-
     /**
      * Send a prompt to the LLM and get a response
      */
@@ -135,15 +143,31 @@ class MSPClient(private val context: Context) {
         includeHistory: Boolean = false,
         includeDatabaseContext: Boolean = false
     ): String = withContext(Dispatchers.IO) {
-        // Use the local database context builder instead of fetchDatabaseContextFromServer()
-        val dbContext = buildDatabaseContext()
-        val enhancedPrompt = """
+        // Calculate prompt size and log
+        val promptSize = prompt.length * 2  // Rough estimation of bytes
+        Log.d(tag, "Prompt size: approximately ${promptSize / 1024}KB")
+        
+        // Check if prompt is too large
+        val maxAllowedSize = 8 * 1024 * 1024  // 8MB limit
+        if (promptSize > maxAllowedSize) {
+            Log.w(tag, "Prompt exceeds maximum allowed size. Truncating...")
+            // Handle large prompt by using a summarized database context
+            return@withContext sendPromptWithTruncation(prompt, includeHistory, includeDatabaseContext)
+        }
+        
+        // For regular sized prompts, use the standard database context
+        val dbContext = if (includeDatabaseContext) buildDatabaseContext() else ""
+        val enhancedPrompt = if (includeDatabaseContext) {
+            """
             Contexto de la Base de Datos (JSON):
             $dbContext
     
             Consulta del Usuario:
             $prompt
-        """.trimIndent()
+            """.trimIndent()
+        } else {
+            prompt
+        }
     
         var currentBaseUrl = ""
         var response = ""
@@ -154,47 +178,67 @@ class MSPClient(private val context: Context) {
         for (baseUrl in possibleBaseUrls) {
             currentBaseUrl = baseUrl
             try {
+                Log.d(tag, "Trying to connect to $baseUrl...")
+                
                 // Construct the request URL
                 val url = URL("$baseUrl/api/generate")
                 val connection = url.openConnection() as HttpURLConnection
     
-                // Set up the connection
+                // Set up the connection with increased timeouts
                 connection.requestMethod = "POST"
                 connection.setRequestProperty("Content-Type", "application/json")
+                connection.setRequestProperty("Accept", "application/json")
+                connection.connectTimeout = 15000  // 15 seconds
+                connection.readTimeout = 60000    // 60 seconds
                 connection.doOutput = true
     
                 // Create the request body
                 val requestBody = JSONObject().apply {
                     put("model", modelName)
-                    put("prompt", enhancedPrompt) // Use the enhanced prompt here
+                    put("prompt", enhancedPrompt)
                     put("stream", false)
     
                     // Add options for context handling
                     val options = JSONObject().apply {
                         put("include_history", includeHistory)
-                        put("include_database_context", includeDatabaseContext)
+                        put("include_database_context", false)  // We've already added it if needed
                     }
                     put("options", options)
                 }
     
-                // Send the request
-                val outputStream = OutputStreamWriter(connection.outputStream)
-                outputStream.write(requestBody.toString())
-                outputStream.flush()
-    
-                // Get the response
-                val responseCode = connection.responseCode
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    val reader = BufferedReader(InputStreamReader(connection.inputStream))
-                    val responseJson = JSONObject(reader.readText())
-                    response = responseJson.getString("response")
-                    success = true
-                    break
-                } else {
-                    Log.e(tag, "Error response from $baseUrl: $responseCode")
+                try {
+                    // Send the request
+                    val outputStream = OutputStreamWriter(connection.outputStream)
+                    outputStream.write(requestBody.toString())
+                    outputStream.flush()
+                    outputStream.close()
+        
+                    // Get the response
+                    val responseCode = connection.responseCode
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        val reader = BufferedReader(InputStreamReader(connection.inputStream))
+                        val responseJson = JSONObject(reader.readText())
+                        response = responseJson.getString("response")
+                        success = true
+                        connection.disconnect()
+                        break
+                    } else {
+                        Log.e(tag, "Error response from $baseUrl: $responseCode")
+                        // Try to read error message if available
+                        try {
+                            val errorReader = BufferedReader(InputStreamReader(connection.errorStream))
+                            val errorResponse = errorReader.readText()
+                            Log.e(tag, "Error details: $errorResponse")
+                        } catch (e: Exception) {
+                            Log.e(tag, "Could not read error details", e)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(tag, "Error sending request to $baseUrl", e)
+                    lastError = e
+                } finally {
+                    connection.disconnect()
                 }
-    
-                connection.disconnect()
             } catch (e: ConnectException) {
                 Log.e(tag, "Failed to connect to $baseUrl", e)
                 lastError = e
@@ -203,100 +247,110 @@ class MSPClient(private val context: Context) {
                 lastError = e
             }
         }
-    
+        
         if (!success) {
             Log.e(tag, "All base URLs failed", lastError)
             return@withContext "Error: No se pudo conectar al servidor LLM. ${lastError?.message ?: ""}"
         }
-    
+        
         return@withContext response
     }
-    // Only ONE definition of sendPromptInternal should exist:
-    private suspend fun sendPromptInternal(prompt: String, isWarmup: Boolean = false): String = withContext(Dispatchers.IO) {
-        if (isServerRunning()) {
+
+    /**
+     * Handles large prompts by truncating and summarizing
+     */
+    private suspend fun sendPromptWithTruncation(
+        originalPrompt: String, 
+        includeHistory: Boolean,
+        includeDatabaseContext: Boolean
+    ): String = withContext(Dispatchers.IO) {
+        // Create a simplified database context
+        val simplifiedContext = """
+            La base de datos contiene tablas para usuarios, personas, videos, topics, tasks y subscriptions.
+            El sistema es una plataforma educativa donde los usuarios pueden suscribirse a creadores
+            y acceder a sus contenidos organizados en topics con tareas asociadas.
+        """.trimIndent()
+        
+        // Create a shorter prompt
+        val truncatedPrompt = """
+            $simplifiedContext
+            
+            INSTRUCCIONES: Responde de manera concisa a la siguiente consulta basándote en tu conocimiento general
+            sobre sistemas educativos y bases de datos con las tablas mencionadas.
+            
+            CONSULTA DEL USUARIO:
+            ${originalPrompt.take(2000)}
+        """.trimIndent()
+        
+        // Now send this truncated prompt
+        var response = ""
+        var success = false
+        var lastError: Exception? = null
+        
+        // Try each possible base URL until one works
+        for (baseUrl in possibleBaseUrls) {
             try {
-                Log.d(tag, "Attempting to send prompt to Ollama server")
-                val ollamaResponse = sendToOllama(prompt)
-                if (ollamaResponse.isNotBlank() && !ollamaResponse.contains("error", ignoreCase = true)) {
-                    Log.i(tag, "Received valid response from Ollama")
-                    return@withContext ollamaResponse
+                Log.d(tag, "Trying truncated prompt on $baseUrl...")
+                val url = URL("$baseUrl/api/generate")
+                val connection = url.openConnection() as HttpURLConnection
+                
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.connectTimeout = 15000
+                connection.readTimeout = 30000
+                connection.doOutput = true
+                
+                val requestBody = JSONObject().apply {
+                    put("model", modelName)
+                    put("prompt", truncatedPrompt)
+                    put("stream", false)
+                    
+                    val options = JSONObject().apply {
+                        put("include_history", includeHistory)
+                        put("include_database_context", false)
+                    }
+                    put("options", options)
                 }
-                Log.w(tag, "Ollama response was blank or contained 'error'. Response: $ollamaResponse")
-            } catch (e: Exception) {
-                Log.e(tag, "Error enviando prompt a Ollama. Se intentará con el modelo local. Detalle: ${e.message}")
-            }
-        }
-        if (!isWarmup) {
-            Log.w(tag, "Servidor Ollama no disponible. Usando modelo local.")
-            try {
-                val localLlamaService = LocalLlamaService(context)
-                val localResponse = localLlamaService.generateResponse(prompt)
-                Log.i(tag, "Respuesta obtenida del modelo local.")
-                return@withContext localResponse
-            } catch (e: Exception) {
-                Log.e(tag, "Error usando el modelo local: ${e.message}")
-                return@withContext "Error al procesar la consulta con el servicio local: ${e.message}"
-            }
-        } else {
-            Log.w(tag, "Ollama server not running during warmup.")
-            return@withContext "Ollama server not available for warmup."
-        }
-        Log.e(tag, "No se pudo obtener respuesta ni de Ollama ni del modelo local.")
-        return@withContext "No se pudo conectar al servidor de Ollama ni al servicio local de Llama. Verifica las conexiones."
-    }
-
-    private suspend fun sendToOllama(prompt: String): String = withContext(Dispatchers.IO) {
-        val url = URL("${getBaseUrl()}/api/generate")
-        val connection = url.openConnection() as HttpURLConnection
-
-        try {
-            connection.requestMethod = "POST"
-            connection.setRequestProperty("Content-Type", "application/json; utf-8")
-            connection.setRequestProperty("Accept", "application/json")
-            connection.doOutput = true
-            connection.connectTimeout = 15000
-            connection.readTimeout = 60000
-
-            val jsonRequest = JSONObject().apply {
-                put("model", modelName)
-                put("prompt", prompt)
-                put("stream", false)
-            }
-
-            OutputStreamWriter(connection.outputStream, "UTF-8").use { writer ->
-                writer.write(jsonRequest.toString())
-                writer.flush()
-            }
-
-            val responseCode = connection.responseCode
-            Log.d(tag, "Ollama API response code: $responseCode")
-
-            val inputStream = if (responseCode in 200..299) {
-                connection.inputStream
-            } else {
-                connection.errorStream
-            }
-
-            val responseText = BufferedReader(InputStreamReader(inputStream, "UTF-8")).use { reader ->
-                val response = StringBuilder()
-                var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    response.append(line)
+                
+                try {
+                    OutputStreamWriter(connection.outputStream).use { writer ->
+                        writer.write(requestBody.toString())
+                        writer.flush()
+                    }
+                    
+                    val responseCode = connection.responseCode
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        val reader = BufferedReader(InputStreamReader(connection.inputStream))
+                        val responseJson = JSONObject(reader.readText())
+                        response = responseJson.optString("response", "")
+                        
+                        // Add a note about truncation
+                        response = """
+                            [Nota: Debido al tamaño de la consulta, se utilizó una versión resumida del contexto]
+                            
+                            $response
+                        """.trimIndent()
+                        
+                        success = true
+                        break
+                    }
+                } catch (e: Exception) {
+                    Log.e(tag, "Error in request to $baseUrl: ${e.message}")
+                    lastError = e
+                } finally {
+                    connection.disconnect()
                 }
-                response.toString()
+            } catch (e: Exception) {
+                Log.e(tag, "Error sending truncated prompt to $baseUrl", e)
+                lastError = e
             }
-
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                val jsonResponse = JSONObject(responseText)
-                return@withContext jsonResponse.optString("response", "")
-            } else {
-                Log.e(tag, "Ollama API Error ($responseCode): $responseText")
-                val errorMsg = try { JSONObject(responseText).optString("error", "Error desconocido del servidor") } catch (e: Exception) { responseText }
-                return@withContext "Error del servidor Ollama ($responseCode): $errorMsg"
-            }
-        } finally {
-            connection.disconnect()
         }
+        
+        if (!success) {
+            return@withContext "Error: La consulta es demasiado grande para procesar. Por favor, simplifica tu pregunta o especifica exactamente qué información necesitas. ${lastError?.message ?: ""}"
+        }
+        
+        return@withContext response
     }
 
     suspend fun buildDatabaseContext(): String = withContext(Dispatchers.IO) {
@@ -420,5 +474,61 @@ class MSPClient(private val context: Context) {
             $prompt
         """.trimIndent()
         return sendPrompt(fullPrompt)
+    }
+
+    /**
+     * Internal implementation of prompt sending with size validation
+     * Used by preloadLocalModel for warmup and other internal operations
+     */
+    private suspend fun sendPromptInternal(prompt: String, isWarmup: Boolean = false): String = withContext(Dispatchers.IO) {
+        // Don't log the full prompt if it's a warmup to avoid log spam
+        if (isWarmup) {
+            Log.d(tag, "Sending internal warmup prompt")
+        } else {
+            Log.d(tag, "Sending internal prompt: ${prompt.take(50)}...")
+        }
+        
+        for (baseUrl in possibleBaseUrls) {
+            try {
+                Log.d(tag, "Trying internal prompt on $baseUrl...")
+                val url = URL("$baseUrl/api/generate")
+                val connection = url.openConnection() as HttpURLConnection
+                
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.connectTimeout = 5000   // Shorter timeout for warmup
+                connection.readTimeout = 10000     // Shorter timeout for warmup
+                connection.doOutput = true
+                
+                val requestBody = JSONObject().apply {
+                    put("model", modelName)
+                    put("prompt", prompt)
+                    put("stream", false)
+                }
+                
+                try {
+                    OutputStreamWriter(connection.outputStream).use { writer ->
+                        writer.write(requestBody.toString())
+                        writer.flush()
+                    }
+                    
+                    val responseCode = connection.responseCode
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        val reader = BufferedReader(InputStreamReader(connection.inputStream))
+                        val responseJson = JSONObject(reader.readText())
+                        Log.d(tag, "Internal prompt successful on $baseUrl")
+                        return@withContext responseJson.optString("response", "")
+                    }
+                } catch (e: Exception) {
+                    Log.e(tag, "Error in internal request to $baseUrl: ${e.message}")
+                } finally {
+                    connection.disconnect()
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Error sending internal prompt to $baseUrl: ${e.message}")
+            }
+        }
+        
+        return@withContext "Error: No se pudo conectar a ningún servidor disponible."
     }
 }

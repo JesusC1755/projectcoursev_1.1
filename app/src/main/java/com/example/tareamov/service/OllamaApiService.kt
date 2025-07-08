@@ -2,9 +2,13 @@ package com.example.tareamov.service
 
 import com.example.tareamov.data.model.OllamaRequest
 import com.example.tareamov.data.model.OllamaResponse
+import okhttp3.OkHttpClient
 import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.POST
+import java.util.concurrent.TimeUnit
 
 interface OllamaApiService {
     
@@ -16,5 +20,21 @@ interface OllamaApiService {
     
     companion object {
         const val BASE_URL = "http://localhost:11434/"
+        
+        fun create(): OllamaApiService {
+            val client = OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(120, TimeUnit.SECONDS)  // Increased timeout for large responses
+                .writeTimeout(60, TimeUnit.SECONDS)  // Increased timeout for large requests
+                .build()
+            
+            val retrofit = Retrofit.Builder()
+                .baseUrl(BASE_URL)
+                .client(client)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+            
+            return retrofit.create(OllamaApiService::class.java)
+        }
     }
 }

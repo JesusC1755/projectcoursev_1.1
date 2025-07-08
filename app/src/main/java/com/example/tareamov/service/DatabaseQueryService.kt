@@ -100,62 +100,138 @@ class DatabaseQueryService(private val context: Context) {
         }
     }
 
-    // New function to always include JSON context
+    // New function to always include JSON context - optimized for payload size
     private suspend fun processNaturalLanguageQueryWithJson(query: String, dbJson: String): String {
+        // Check and limit the size of the database JSON to avoid payload issues
+        // Significantly reduced maximum size to avoid "Payload size exceeded" errors
+        val maxJsonSize = 100 * 1024 // Limit to 100KB
+        
+        // Log the original size for debugging
+        Log.d(tag, "Original database JSON size: ${dbJson.length} bytes")
+        
+        // Always summarize the database JSON to avoid payload issues
+        val limitedDbJson = summarizeDatabaseJson(dbJson)
+        Log.d(tag, "Summarized database JSON size: ${limitedDbJson.length} bytes")
+        
+        // Build a more focused schema-only description rather than including the full JSON
+        val tablesList = """
+            - usuarios: Credenciales y roles de usuarios
+            - personas: Datos personales (nombre, email, etc.)
+            - videos: Cursos multimedia disponibles
+            - topics: Temas asociados a cursos
+            - contentItems: Elementos de contenido educativo
+            - tasks: Tareas asignadas por tema
+            - subscriptions: Suscripciones entre usuarios
+            - taskSubmissions: Entregas de tareas
+            - purchases: Compras de cursos
+        """.trimIndent()
+        
+        // Create a much more compact prompt
         val prompt = """
-            Eres un asistente experto en bases de datos de una plataforma educativa.
-            Aquí tienes el contexto completo de la base de datos en formato JSON:
-            $dbJson
-
-            Este JSON contiene información completa de todas las tablas de la base de datos:
+            Eres un asistente experto en bases de datos educativas.
             
-            TABLAS PRINCIPALES:
-            - usuarios: Todos los usuarios registrados en el sistema con sus credenciales
-            - personas: Información personal detallada de los usuarios (nombres, apellidos, email, etc.)
-            - videos: Cursos disponibles en la plataforma con sus metadatos
-            - topics: Temas o módulos asociados a cada curso
-            - contentItems: Elementos de contenido (documentos, videos, enlaces) asociados a cada tema
-            - tasks: Tareas o actividades asignadas a los temas del curso
-            - subscriptions: Relaciones de suscripción entre estudiantes y creadores de contenido
-            - taskSubmissions: Entregas de tareas realizadas por los estudiantes con sus calificaciones
-            - purchases: Registro de compras de cursos realizadas por los usuarios
+            ESQUEMA DE BASE DE DATOS:
+            $tablesList
+            
+            DATOS RESUMIDOS:
+            $limitedDbJson
             
             RELACIONES CLAVE:
-            1. Un 'Usuario' está vinculado a una 'Persona' por 'persona_id'.
-            2. Un 'Video' (Curso) puede tener múltiples 'Topics' asociados por 'courseId'.
-            3. Un 'Topic' puede tener múltiples 'ContentItems' asociados por 'topicId'.
-            4. Un 'Topic' puede tener múltiples 'Tasks' asociadas por 'topicId'.
-            5. Una 'TaskSubmission' está vinculada a una 'Task' por 'taskId' y a un estudiante por 'studentUsername'.
-            6. Una 'Subscription' conecta un 'subscriberUsername' con un 'creatorUsername'.
-            7. Una 'Purchase' registra la compra de un curso (video) por un usuario.
+            1. Usuario → Persona (1:1)
+            2. Video (Curso) → Topics (1:N)
+            3. Topic → ContentItems, Tasks (1:N)
+            4. Subscription: subscriberUsername → creatorUsername
             
-            INSTRUCCIONES:
-            - Usa ÚNICAMENTE la información proporcionada en el JSON para responder.
-            - Si la información solicitada no está disponible en el JSON, indícalo claramente.
-            - Para consultas sobre contenido de cursos, verifica tanto en 'videos' como en 'topics' y 'contentItems'.
-            - Para consultas sobre tareas, verifica en 'tasks' y 'taskSubmissions'.
-            - Para consultas sobre usuarios, verifica tanto en 'usuarios' como en 'personas'.
+            CONSULTA: $query
             
-            Consulta del usuario:
-            "$query"
-            
-            Por favor, proporciona una respuesta clara y completa basada en los datos disponibles.
+            Responde de manera concisa usando solo la información disponible.
         """.trimIndent()
 
-        // Try MSPClient first, then LocalLlamaService, then fallback
+        // Log the prompt size for debugging
+        val promptSize = prompt.length
+        Log.d(tag, "Prompt size: $promptSize bytes")
+        
+        // Safety check - if somehow the prompt is still too large, truncate it further
+        val finalPrompt = if (promptSize > 500000) {
+            Log.w(tag, "Prompt still too large at $promptSize bytes. Emergency truncation applied.")
+            """
+            Consulta la base de datos de la plataforma educativa.
+            Las tablas son: usuarios, personas, videos, topics, tasks, subscriptions.
+            
+            Consulta: ${query.take(100)}
+            """.trimIndent()
+        } else {
+            prompt
+        }
+
+        // Try MSPClient first with retry mechanism for better reliability
+        for (attempt in 1..3) {
+            try {
+                Log.d(tag, "MSPClient attempt $attempt")
+                val response = mspClient.sendPrompt(finalPrompt, includeHistory = false, includeDatabaseContext = false)
+                if (response.isNotBlank() && !response.contains("Error:", ignoreCase = true)) {
+                    return response
+                }
+                Log.w(tag, "MSPClient attempt $attempt failed with response: $response")
+            } catch (e: Exception) {
+                Log.e(tag, "MSPClient attempt $attempt failed with exception", e)
+            }
+        }
+        
+        // Try LocalLlamaService as fallback
         try {
-            val response = mspClient.sendPrompt(prompt)
+            Log.d(tag, "Falling back to LocalLlamaService")
+            val response = localLlamaService.generateResponse(finalPrompt)
             if (response.isNotBlank() && !response.contains("Error:", ignoreCase = true)) {
                 return response
             }
-        } catch (_: Exception) {}
-        try {
-            val response = localLlamaService.generateResponse(prompt)
-            if (response.isNotBlank() && !response.contains("Error:", ignoreCase = true)) {
-                return response
-            }
-        } catch (_: Exception) {}
+            Log.w(tag, "LocalLlamaService failed: $response")
+        } catch (e: Exception) {
+            Log.e(tag, "LocalLlamaService failed with exception", e)
+        }
+        
+        // If all LLM attempts fail, fall back to basic database query
+        Log.w(tag, "All LLM attempts failed. Falling back to basic database query.")
         return handleBasicDatabaseQuery(query)
+    }
+
+    /**
+     * Summarizes the database JSON to reduce payload size
+     */
+    private fun summarizeDatabaseJson(fullJson: String): String {
+        try {
+            val jsonObj = JSONObject(fullJson)
+            val summary = StringBuilder()
+            
+            // Create an ultra-compact summary with just record counts and minimal sample data
+            summary.appendLine("RESUMEN DE TABLAS:")
+            
+            jsonObj.keys().forEach { tableName ->
+                val tableData = jsonObj.optJSONArray(tableName)
+                val recordCount = tableData?.length() ?: 0
+                
+                summary.appendLine("- $tableName: $recordCount registros")
+                
+                // For each table with data, show at most 1 record as example
+                if (recordCount > 0) {
+                    val sampleRecord = tableData!!.getJSONObject(0)
+                    
+                    // Extract just key fields (limit to 5 fields maximum)
+                    val keyFields = sampleRecord.keys().asSequence().take(5).toList()
+                    val sampleData = keyFields.joinToString(", ") { field -> 
+                        "$field: ${sampleRecord.optString(field, "").take(15)}"
+                    }
+                    
+                    summary.appendLine("  Ejemplo: { $sampleData }")
+                }
+            }
+            
+            return summary.toString()
+        } catch (e: Exception) {
+            Log.e(tag, "Error summarizing database JSON", e)
+            // Return an extremely simplified version as fallback
+            return "Error al resumir la base de datos. Consulta más específica."
+        }
     }
 
     /**
@@ -225,8 +301,19 @@ class DatabaseQueryService(private val context: Context) {
 
         return try {
             // Prepare database context for better LLM responses
+            // Check if the database context is too large
+            val maxContextSize = 5 * 1024  // 5KB limit for context
             val databaseContext = getDatabaseContext()
-            Log.v(tag, "Database Context for LLM:\n$databaseContext")
+            
+            // If context is too large, use a summarized version
+            val optimizedContext = if (databaseContext.length > maxContextSize) {
+                Log.w(tag, "Database context too large (${databaseContext.length} chars). Using summarized version.")
+                summarizeDatabaseContext(databaseContext)
+            } else {
+                databaseContext
+            }
+            
+            Log.v(tag, "Optimized Database Context size: ${optimizedContext.length} chars")
 
             // Construct a more robust prompt
             val systemPrompt = "Eres un asistente experto en bases de datos SQL. Tu tarea es responder preguntas sobre una base de datos específica basándote únicamente en el esquema y los datos proporcionados. Sé conciso y preciso. Si la pregunta es ambigua, pide aclaraciones. Si la información no está disponible, indícalo claramente. No inventes información."
@@ -236,9 +323,7 @@ class DatabaseQueryService(private val context: Context) {
             $contextMessage
 
             Contexto de la Base de Datos:
-            $databaseContext
-
-{{ edit_2 }}
+            $optimizedContext
 
             La tabla 'usuarios' contiene la lista completa de todos los usuarios registrados en el sistema.
             La tabla 'subscriptions' contiene información sobre las relaciones de suscripción entre usuarios, no el total de usuarios.
@@ -289,65 +374,40 @@ class DatabaseQueryService(private val context: Context) {
             "Ocurrió un error inesperado al procesar tu consulta. Por favor, intenta de nuevo más tarde. Detalles: ${e.message}"
         }
     }
-
+    
     /**
-     * Get comprehensive database context for better LLM responses
+     * Creates a summarized version of the database context
      */
-    private suspend fun getDatabaseContext(): String = withContext(Dispatchers.IO) {
-        val contextBuilder = StringBuilder()
-
-        try {
-            // Obtener datos completos de cada entidad
-            val usuarios = database.usuarioDao().getAllUsuarios()
-            val videos = database.videoDao().getAllVideos()
-            val topics = database.topicDao().getAllTopics()
-            val contentItems = database.contentItemDao().getAllContentItems()
-            val personas = database.personaDao().getAllPersonasList()
-            val tasks = database.taskDao().getAllTasks()
-            val subscriptions = database.subscriptionDao().getAllSubscriptions()
-            val taskSubmissions = database.taskSubmissionDao().getAllTaskSubmissions()
-            val purchases = database.purchaseDao().getAllPurchases()
-
-            contextBuilder.append("Resumen de Datos:\n")
-            contextBuilder.append("- Total Usuarios: ${usuarios.size}\n")
-            contextBuilder.append("- Total Videos (Cursos): ${videos.size}\n")
-            contextBuilder.append("- Total Temas: ${topics.size}\n")
-            contextBuilder.append("- Total Elementos de Contenido: ${contentItems.size}\n")
-            contextBuilder.append("- Total Personas: ${personas.size}\n")
-            contextBuilder.append("- Total Tareas: ${tasks.size}\n")
-            contextBuilder.append("- Total Suscripciones: ${subscriptions.size}\n")
-            contextBuilder.append("- Total Entregas de Tareas: ${taskSubmissions.size}\n")
-            contextBuilder.append("- Total Compras: ${purchases.size}\n\n")
-
-            // Esquema detallado de todas las tablas
-            contextBuilder.append("Esquema de la Base de Datos (Tablas y Columnas Principales):\n")
-            contextBuilder.append("- Tabla 'usuarios': id (INTEGER PRIMARY KEY), usuario (TEXT UNIQUE NOT NULL), contrasena (TEXT NOT NULL), persona_id (INTEGER, FK -> personas.id)\n")
-            contextBuilder.append("- Tabla 'personas': id (INTEGER PRIMARY KEY), identificacion (TEXT), nombres (TEXT NOT NULL), apellidos (TEXT NOT NULL), email (TEXT UNIQUE), telefono (TEXT), direccion (TEXT), fechaNacimiento (TEXT), avatar (TEXT), esUsuario (INTEGER NOT NULL DEFAULT 0)\n")
-            contextBuilder.append("- Tabla 'videos': id (INTEGER PRIMARY KEY), username (TEXT NOT NULL), description (TEXT), title (TEXT NOT NULL), videoUriString (TEXT), timestamp (INTEGER NOT NULL), localFilePath (TEXT)\n")
-            contextBuilder.append("- Tabla 'topics': id (INTEGER PRIMARY KEY), courseId (INTEGER NOT NULL, FK -> videos.id ON DELETE CASCADE), name (TEXT NOT NULL), description (TEXT), orderIndex (INTEGER NOT NULL)\n")
-            contextBuilder.append("- Tabla 'content_items': id (INTEGER PRIMARY KEY), topicId (INTEGER NOT NULL, FK -> topics.id ON DELETE CASCADE), name (TEXT NOT NULL), uriString (TEXT NOT NULL), contentType (TEXT NOT NULL), orderIndex (INTEGER NOT NULL)\n")
-            contextBuilder.append("- Tabla 'tasks': id (INTEGER PRIMARY KEY AUTOINCREMENT), topicId (INTEGER NOT NULL, FK -> topics.id), name (TEXT NOT NULL), description (TEXT), orderIndex (INTEGER NOT NULL), completed (INTEGER NOT NULL DEFAULT 0)\n")
-            contextBuilder.append("- Tabla 'subscriptions': subscriberUsername (TEXT NOT NULL), creatorUsername (TEXT NOT NULL), subscriptionDate (LONG NOT NULL)\n")
-            contextBuilder.append("- Tabla 'task_submissions': id (INTEGER PRIMARY KEY AUTOINCREMENT), taskId (INTEGER NOT NULL, FK -> tasks.id), studentUsername (TEXT NOT NULL), submissionDate (LONG NOT NULL), fileUri (TEXT), grade (REAL), feedback (TEXT)\n")
-            contextBuilder.append("- Tabla 'purchases': id (INTEGER PRIMARY KEY AUTOINCREMENT), username (TEXT NOT NULL), courseId (INTEGER NOT NULL, FK -> videos.id), purchaseDate (LONG NOT NULL), price (REAL NOT NULL)\n\n")
-
-            // Relaciones clave
-            contextBuilder.append("Relaciones Clave:\n")
-            contextBuilder.append("- Un 'Usuario' está vinculado a una 'Persona' por 'persona_id'.\n")
-            contextBuilder.append("- Un 'Video' (Curso) puede tener múltiples 'Topics' asociados por 'courseId'.\n")
-            contextBuilder.append("- Un 'Topic' puede tener múltiples 'ContentItems' asociados por 'topicId'.\n")
-            contextBuilder.append("- Una 'Tarea' pertenece a un 'Topic' por 'topicId'.\n")
-            contextBuilder.append("- Una 'Entrega de Tarea' pertenece a una 'Tarea' por 'taskId'.\n")
-            contextBuilder.append("- Una 'Suscripción' conecta un usuario suscriptor con un creador.\n")
-            contextBuilder.append("- Una 'Compra' conecta un usuario con un curso (video).\n\n")
-
-            // No agregar ejemplos de datos aquí
-        } catch (e: Exception) {
-            Log.e(tag, "Error al obtener contexto detallado de la base de datos", e)
-            contextBuilder.append("\nError al obtener contexto de la base de datos: ${e.message}")
+    private fun summarizeDatabaseContext(fullContext: String): String {
+        // Extract the most important parts of the context
+        val schemaSection = extractSection(fullContext, "ESQUEMA DE LA BASE DE DATOS", "RESUMEN DE DATOS")
+        val summarySection = extractSection(fullContext, "RESUMEN DE DATOS", "DATOS RECIENTES/IMPORTANTES")
+        
+        // Create a shorter version
+        return """
+            # ESQUEMA DE LA BASE DE DATOS (Resumido)
+            ${schemaSection?.take(1000) ?: "Información de esquema no disponible"}
+            
+            # RESUMEN DE DATOS
+            ${summarySection?.take(500) ?: "Información de resumen no disponible"}
+            
+            [Nota: Contexto resumido por limitaciones de tamaño]
+        """.trimIndent()
+    }
+    
+    /**
+     * Helper function to extract a section from text
+     */
+    private fun extractSection(text: String, startMarker: String, endMarker: String): String? {
+        val startIndex = text.indexOf(startMarker)
+        if (startIndex < 0) return null
+        
+        val endIndex = text.indexOf(endMarker, startIndex)
+        return if (endIndex > startIndex) {
+            text.substring(startIndex, endIndex).trim()
+        } else {
+            text.substring(startIndex).trim()
         }
-
-        return@withContext contextBuilder.toString()
     }
 
     /**
@@ -467,6 +527,81 @@ class DatabaseQueryService(private val context: Context) {
         } catch (e: Exception) {
             Log.e(tag, "Error generating database JSON", e)
             return@withContext "{}"
+        }
+    }
+
+    /**
+     * Builds and returns the database context string
+     * Contains schema and summary information for use with the LLM
+     */
+    private suspend fun getDatabaseContext(): String = withContext(Dispatchers.IO) {
+        try {
+            // Get fresh database JSON
+            val dbJson = generateDatabaseJson()
+            
+            // Convert JSON to more readable format
+            val jsonObj = JSONObject(dbJson)
+            val tableNames = jsonObj.keys().asSequence().toList()
+            
+            // Build a structured context with table schema and sample data
+            val context = StringBuilder()
+            
+            // Add database overview
+            context.appendLine("# ESQUEMA DE LA BASE DE DATOS")
+            context.appendLine("## Tablas disponibles")
+            tableNames.forEach { tableName -> 
+                context.appendLine("- $tableName")
+            }
+            context.appendLine()
+            
+            // Add table details with row counts
+            tableNames.forEach { tableName ->
+                val tableArray = jsonObj.optJSONArray(tableName)
+                val rowCount = tableArray?.length() ?: 0
+                
+                context.appendLine("## Tabla: $tableName (${rowCount} registros)")
+                
+                // Add schema information from the first row if available
+                if (rowCount > 0) {
+                    val firstRow = tableArray!!.getJSONObject(0)
+                    val columns = firstRow.keys().asSequence().toList()
+                    
+                    context.appendLine("### Columnas:")
+                    columns.forEach { column ->
+                        val value = firstRow.opt(column)
+                        val type = when(value) {
+                            is Int, is Long -> "Número"
+                            is Boolean -> "Boolean"
+                            else -> "Texto"
+                        }
+                        context.appendLine("- $column: $type")
+                    }
+                    
+                    // Add a few sample records
+                    context.appendLine("### Ejemplo de datos:")
+                    val sampleSize = minOf(3, rowCount)
+                    for (i in 0 until sampleSize) {
+                        val row = tableArray.getJSONObject(i)
+                        context.appendLine("- Registro ${i+1}: ${row.toString().take(100)}")
+                    }
+                } else {
+                    context.appendLine("*Tabla vacía*")
+                }
+                context.appendLine()
+            }
+            
+            // Add special schema information
+            context.appendLine("## Esquemas específicos")
+            context.appendLine("### Tasks:")
+            context.appendLine(taskSchema)
+            context.appendLine()
+            context.appendLine("### Subscriptions:")
+            context.appendLine(subscriptionSchema)
+            
+            return@withContext context.toString()
+        } catch (e: Exception) {
+            Log.e(tag, "Error generating database context", e)
+            return@withContext "Error al generar contexto de base de datos: ${e.message}"
         }
     }
 }

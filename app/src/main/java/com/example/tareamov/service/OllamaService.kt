@@ -51,15 +51,40 @@ class OllamaService : Service() {
 
     private suspend fun tryStartOllama() {
         try {
-            // Check if Ollama is already running
-            if (mspClient.isServerRunning()) {
-                Log.d(TAG, "Ollama is already running")
+            // Try your current IP address first (from ipconfig)
+            if (mspClient.isServerRunning("http://192.168.1.158:11435")) {
+                Log.d(TAG, "✅ Ollama is running at 192.168.1.158:11435")
+                
+                // Broadcast a notification that Ollama is running
+                val broadcastIntent = Intent("com.example.tareamov.OLLAMA_STATUS")
+                broadcastIntent.putExtra("status", "running")
+                broadcastIntent.putExtra("message", "Ollama está ejecutándose en 192.168.1.158:11435")
+                sendBroadcast(broadcastIntent)
                 return
             }
+            
+            // Try other addresses
+            val otherAddresses = listOf(
+                "http://localhost:11435" to "localhost:11435",
+                "http://127.0.0.1:11435" to "127.0.0.1:11435",
+                "http://0.0.0.0:11435" to "0.0.0.0:11435"
+            )
+            
+            for ((url, displayAddress) in otherAddresses) {
+                if (mspClient.isServerRunning(url)) {
+                    Log.d(TAG, "✅ Ollama is running at $displayAddress")
+                    
+                    // Broadcast a notification that Ollama is running
+                    val broadcastIntent = Intent("com.example.tareamov.OLLAMA_STATUS")
+                    broadcastIntent.putExtra("status", "running")
+                    broadcastIntent.putExtra("message", "Ollama está ejecutándose en $displayAddress")
+                    sendBroadcast(broadcastIntent)
+                    return
+                }
+            }
 
-            // On Android, we can't directly start Ollama on the host machine,
-            // but we can log a message suggesting the user to start it
-            Log.d(TAG, "Attempting to use local fallback since Ollama is not running")
+            // If we get here, Ollama is not running
+            Log.w(TAG, "⚠️ Ollama is not running on any expected address")
 
             // Broadcast a notification that Ollama needs to be started
             val broadcastIntent = Intent("com.example.tareamov.OLLAMA_STATUS")
@@ -68,7 +93,7 @@ class OllamaService : Service() {
             sendBroadcast(broadcastIntent)
 
             // Wait a bit to see if the user starts Ollama
-            delay(0)
+            delay(2000)
         } catch (e: Exception) {
             Log.e(TAG, "Error trying to start Ollama", e)
         }
@@ -82,7 +107,7 @@ class OllamaService : Service() {
         while (retryCount < maxRetries && !connected) {
             // Check if the local Ollama server is accessible
             val apiStatus = mspClient.isServerRunning()
-            Log.d(TAG, "Local Ollama status (attempt ${retryCount + 1}): ${if (apiStatus) "accessible" else "not accessible"}")
+            Log.d(TAG, "Local Ollama status (attempt ${retryCount + 1}): ${if (apiStatus) "✅ accessible" else "❌ not accessible"}")
 
             if (apiStatus) {
                 connected = true
@@ -90,14 +115,11 @@ class OllamaService : Service() {
                 try {
                     Log.d(TAG, "Sending test prompt to initialize model...")
 
-                    // Build enhanced context including Task and Subscription data
-                    val enhancedContext = buildEnhancedDatabaseContext()
-
+                    // Simple test prompt to minimize potential issues
+                    val testPrompt = "Responde con 'Modelo llama3 inicializado correctamente'"
+                    
                     val testResponse = mspClient.sendPrompt(
-                        "Eres un asistente de base de datos para una aplicación Android llamada TareaMov. " +
-                                "Tienes acceso a la siguiente información de la base de datos:\n\n" +
-                                enhancedContext + "\n\n" +
-                                "Por favor responde con 'Modelo llama3 inicializado correctamente y listo para consultas de base de datos.'",
+                        testPrompt,
                         includeHistory = false,
                         includeDatabaseContext = false
                     )
@@ -108,6 +130,17 @@ class OllamaService : Service() {
                     broadcastIntent.putExtra("status", "ready")
                     broadcastIntent.putExtra("message", "Modelo Llama3 inicializado correctamente")
                     sendBroadcast(broadcastIntent)
+                    
+                    // Now that we know the model works, build the database context in background
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            Log.d(TAG, "Building database context in background...")
+                            val context = buildEnhancedDatabaseContext()
+                            Log.d(TAG, "Database context built successfully (${context.length} chars)")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error building database context in background", e)
+                        }
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error during model initialization", e)
                     connected = false
@@ -116,7 +149,7 @@ class OllamaService : Service() {
             } else {
                 // Wait before retrying
                 Log.d(TAG, "Waiting before retry...")
-                delay(retryDelayMs.toLong()) // Delay between retries
+                delay(retryDelayMs.toLong() + 1000) // Add a little delay between retries
                 retryCount++
             }
         }

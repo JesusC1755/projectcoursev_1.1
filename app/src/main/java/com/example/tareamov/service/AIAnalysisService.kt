@@ -35,7 +35,7 @@ class AIAnalysisService(private val context: Context) {
 
     companion object {
         private const val TAG = "AIAnalysisService"
-        private const val OLLAMA_PORT = 11434
+        private const val OLLAMA_PORT = 11435
         private var workingEndpoint: String? = null
         private var detectedEndpoints: List<String>? = null
 

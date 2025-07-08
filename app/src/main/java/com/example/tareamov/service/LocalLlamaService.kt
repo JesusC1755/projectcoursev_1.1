@@ -72,9 +72,40 @@ class LocalLlamaService(private val context: Context) {
         }
 
         try {
-            val enhancedPrompt = if (databaseContext.isNotBlank()) {
+            // Check if prompt is too large
+            val maxPromptSize = 8 * 1024  // 8KB for local model
+            
+            // If the prompt is too large, truncate it
+            val optimizedPrompt = if (prompt.length > maxPromptSize) {
+                Log.w(TAG, "Prompt too large (${prompt.length} chars). Truncating to $maxPromptSize chars.")
+                
+                // Extract the database context and user query
+                val dbContextIndex = prompt.indexOf("Contexto de la Base de Datos")
+                val userQueryIndex = prompt.indexOf("Consulta del Usuario:")
+                
+                if (dbContextIndex >= 0 && userQueryIndex >= 0 && userQueryIndex > dbContextIndex) {
+                    // Create a shortened version with just essential parts
+                    val intro = prompt.substring(0, dbContextIndex + 30)
+                    val userQueryPart = prompt.substring(userQueryIndex)
+                    
+                    // Combine with a simplified database context
+                    """
+                    $intro
+                    [Contexto de base de datos resumido por limitaciones de tamaño]
+                    
+                    $userQueryPart
+                    """.trimIndent()
+                } else {
+                    // Just truncate if we can't find the sections
+                    prompt.substring(0, maxPromptSize) + "\n[Prompt truncado por limitaciones de tamaño]"
+                }
+            } else {
+                prompt
+            }
+            
+            val enhancedPrompt = if (databaseContext.isNotBlank() && !optimizedPrompt.contains("Contexto de la Base de Datos")) {
                 """
-                Contexto de la Base de Datos:
+                Contexto de la Base de Datos (resumido):
                 $databaseContext
                 
                 Esquema adicional:
@@ -86,10 +117,10 @@ class LocalLlamaService(private val context: Context) {
                 - Subscription conecta usuarios (subscriberUsername y creatorUsername)
                 
                 Consulta del Usuario:
-                $prompt
+                $optimizedPrompt
                 """.trimIndent()
             } else {
-                prompt
+                optimizedPrompt
             }
 
             // Here would be the actual call to the Llama model
