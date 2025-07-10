@@ -417,7 +417,7 @@ class ChatBotFragment : Fragment() {
             return "⚠️ **Error de conexión con Ollama**\n\n" +
                    "No se pudo conectar al servidor Ollama. Por favor verifica que:\n\n" +
                    "1. El servidor Ollama esté ejecutándose\n" +
-                   "2. El puerto 11434 esté abierto y accesible\n" +
+                   "2. El puerto 11435 esté abierto y accesible\n" +
                    "3. La conexión de red entre la app y el servidor funcione correctamente\n\n" +
                    "Ejecuta el siguiente comando para iniciar Ollama:\n" +
                    "```\nollama serve\n```"
@@ -435,6 +435,7 @@ class ChatBotFragment : Fragment() {
         // Si Granite está disponible, intentar usarlo
         try {
             Log.d("ChatBotFragment", "Usando el modelo Granite")
+            // Siempre analizar con el modelo, independientemente de si es una consulta sobre archivos o no
             return aiAnalysisService.analyzeWithContext(
                 userMessage = userMessage,
                 fileContext = fileContext,

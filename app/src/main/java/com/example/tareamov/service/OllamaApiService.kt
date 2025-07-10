@@ -19,7 +19,7 @@ interface OllamaApiService {
     suspend fun generateChat(@Body request: OllamaRequest): Response<OllamaResponse>
     
     companion object {
-        const val BASE_URL = "http://localhost:11434/"
+        const val BASE_URL = "http://localhost:11435/"
         
         fun create(): OllamaApiService {
             val client = OkHttpClient.Builder()

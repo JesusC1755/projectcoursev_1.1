@@ -66,7 +66,7 @@ class AIAnalysisService(private val context: Context) {
     private suspend fun getOllamaApi(): OllamaApiService = withContext(Dispatchers.IO) {
         for (attempt in 1..MAX_RETRY_ATTEMPTS) {
             try {
-                val endpoint = detectWorkingEndpoint() ?: generateOllamaEndpoints().firstOrNull() ?: "http://localhost:11434/"
+                val endpoint = detectWorkingEndpoint() ?: generateOllamaEndpoints().firstOrNull() ?: "http://localhost:11435/"
                 Log.d(TAG, "🔄 Intento $attempt de $MAX_RETRY_ATTEMPTS para conectar a Ollama: $endpoint")
 
                 val okHttpClient = OkHttpClient.Builder()
@@ -442,11 +442,12 @@ class AIAnalysisService(private val context: Context) {
 
     private fun buildPromptWithoutContext(userMessage: String): String {
         return buildString {
-            append("Eres un asistente educativo especializado en evaluación académica. ")
-            append("Ayudas a profesores con criterios de calificación, metodologías de evaluación ")
-            append("y retroalimentación constructiva para estudiantes.\n\n")
+            append("Eres un asistente virtual amigable y útil que puede responder a cualquier tipo de pregunta. ")
+            append("Puedes hablar sobre temas generales, responder saludos, proporcionar información, ")
+            append("ofrecer ayuda técnica o simplemente mantener una conversación amistosa.\n\n")
             append("Pregunta: $userMessage\n\n")
-            append("Responde de manera profesional, educativa y constructiva.")
+            append("Responde de manera amigable, informativa y conversacional. ")
+            append("Si el usuario te saluda o hace una pregunta casual, responde naturalmente como en una conversación normal.")
         }
     }
 
@@ -542,17 +543,36 @@ class AIAnalysisService(private val context: Context) {
 
     private fun generateSimpleFallback(userMessage: String): String {
         return when {
-            userMessage.contains("hola", ignoreCase = true) -> {
-                "¡Hola! Soy tu asistente de evaluación académica. Puedo ayudarte a analizar archivos de estudiantes y proporcionar retroalimentación constructiva."
+            userMessage.contains("hola", ignoreCase = true) || 
+            userMessage.contains("buenos días", ignoreCase = true) ||
+            userMessage.contains("buenas tardes", ignoreCase = true) -> {
+                "¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?"
             }
             userMessage.contains("ayuda", ignoreCase = true) -> {
-                "Puedo ayudarte con:\n• Análisis de código y documentos\n• Criterios de evaluación\n• Detección de errores\n• Sugerencias de mejora\n• Retroalimentación para estudiantes"
+                "Puedo ayudarte con:\n• Análisis de código y documentos\n• Responder preguntas generales\n• Mantener una conversación\n• Proporcionar información\n• Asistencia técnica básica"
             }
-            userMessage.contains("califica", ignoreCase = true) -> {
-                "Para calificar efectivamente:\n• Define criterios claros\n• Revisa funcionalidad\n• Evalúa calidad del código\n• Proporciona retroalimentación específica\n• Considera el esfuerzo del estudiante"
+            userMessage.contains("gracias", ignoreCase = true) -> {
+                "¡De nada! Estoy aquí para ayudarte. Si necesitas algo más, no dudes en preguntar."
+            }
+            userMessage.contains("adiós", ignoreCase = true) || 
+            userMessage.contains("hasta luego", ignoreCase = true) -> {
+                "¡Hasta luego! Ha sido un placer chatear contigo. Vuelve cuando quieras."
+            }
+            userMessage.contains("cómo estás", ignoreCase = true) -> {
+                "¡Estoy funcionando perfectamente! Listo para ayudarte con cualquier cosa que necesites. ¿Cómo estás tú?"
+            }
+            userMessage.length < 10 -> {
+                "He recibido tu mensaje. ¿Podrías darme más detalles sobre lo que necesitas para poder ayudarte mejor?"
             }
             else -> {
-                "Entiendo tu consulta. Para ayudarte mejor, comparte el archivo que necesitas evaluar o especifica qué aspecto te interesa analizar."
+                val responses = listOf(
+                    "Entiendo tu consulta, pero en este momento estoy funcionando en modo limitado. ¿Podrías intentarlo de nuevo más tarde?",
+                    "Parece una pregunta interesante. Normalmente podría ayudarte con esto, pero ahora mismo tengo una conexión limitada.",
+                    "Me gustaría ayudarte con eso. ¿Podrías formular tu pregunta de otra manera mientras mejoro mi conexión?",
+                    "Estoy procesando tu consulta. Para obtener una mejor respuesta, intenta cuando la conexión con el modelo de IA esté disponible.",
+                    "Tu pregunta es importante. Cuando el servidor Ollama esté funcionando correctamente, podré darte una respuesta más completa."
+                )
+                responses.random()
             }
         }
     }
@@ -832,7 +852,7 @@ class AIAnalysisService(private val context: Context) {
      * Genera endpoints de Ollama basados en IPs detectadas automáticamente
      *
      * Utiliza cache para evitar regenerar la lista en cada llamada
-     * y construye URLs completas con el puerto estándar de Ollama (11434)
+     * y construye URLs completas con el puerto estándar de Ollama (11435)
      */
     private fun generateOllamaEndpoints(): List<String> {
         if (detectedEndpoints != null) {

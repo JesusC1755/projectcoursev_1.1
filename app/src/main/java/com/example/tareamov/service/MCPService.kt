@@ -968,7 +968,7 @@ class MCPService(private val context: Context) {
             if (isRunning) {
                 "El servidor local de Ollama está funcionando correctamente."
             } else {
-                "El servidor local de Ollama no está accesible. Por favor, asegúrate de que Ollama está ejecutándose en tu PC y que la aplicación puede conectarse a él (10.0.2.2:11434)."
+                "El servidor local de Ollama no está accesible. Por favor, asegúrate de que Ollama está ejecutándose en tu PC y que la aplicación puede conectarse a él (10.0.2.2:11435)."
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error checking server status", e)
