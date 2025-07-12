@@ -23,7 +23,9 @@ class MSPClient(private val context: Context) {
     private val tag = "MSPClient"
     // Lista de IPs posibles (ordenadas por prioridad)
     private val possibleBaseUrls = listOf(
-        "http://192.168.1.158:11435",   // Current IP from ipconfig - Highest priority
+        "http://192.168.1.224:11435",   // Nueva IP Wi-Fi - Highest priority (user request)
+        "http://192.168.1.17:11435",    // Anterior IP Wi-Fi
+        "http://192.168.1.158:11435",   // Previous IP from ipconfig
         "http://localhost:11435",       // Localhost - High priority
         "http://127.0.0.1:11435",       // Loopback - High priority
         "http://0.0.0.0:11435",         // Bind address from Ollama logs

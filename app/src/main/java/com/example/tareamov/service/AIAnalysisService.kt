@@ -777,9 +777,9 @@ class AIAnalysisService(private val context: Context) {
         try {
             Log.d(TAG, "🔍 Iniciando detección automática de IPs...")
 
-            // Agregar IPs estándar primero (alta prioridad) - Modificando el orden para priorizar los más comunes
-            // localhost y 127.0.0.1 primero, luego 0.0.0.0 y otros
-            val standardIPs = listOf("localhost", "127.0.0.1", "10.0.2.2", "0.0.0.0")
+            // Agregar IPs estándar primero (alta prioridad) y la IP Wi-Fi proporcionada por el usuario
+            val userWifiIP = "192.168.1.224"
+            val standardIPs = listOf(userWifiIP, "localhost", "127.0.0.1", "10.0.2.2", "0.0.0.0")
             hostIPs.addAll(standardIPs)
             Log.d(TAG, "✓ IPs estándar agregadas: $standardIPs")
 

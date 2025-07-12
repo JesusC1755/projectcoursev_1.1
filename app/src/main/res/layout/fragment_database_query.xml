@@ -323,6 +323,7 @@
         </LinearLayout>
     </LinearLayout>
 
+
     <!-- Model info at the bottom -->
     <TextView
         android:id="@+id/modelInfo"
