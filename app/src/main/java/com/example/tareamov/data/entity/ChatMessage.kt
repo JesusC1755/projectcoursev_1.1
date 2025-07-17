@@ -12,3 +12,5 @@ data class ChatMessage(
     val timestamp: Long = System.currentTimeMillis(),
     val sessionId: String? = null // Optional: to group conversations
 )
+
+//Hola Herazo...
