@@ -17,6 +17,10 @@ tasks.named("clean") {
     dependsOn("cleanKspCache")
 }
 
+// Leer variables de Supabase desde local.properties
+val supabaseUrl = project.findProperty("SUPABASE_URL") as? String ?: ""
+val supabaseKey = project.findProperty("SUPABASE_KEY") as? String ?: ""
+
 android {
     buildFeatures {
         buildConfig = true
@@ -34,6 +38,10 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Exponer variables de Supabase como BuildConfig
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField("String", "SUPABASE_KEY", "\"$supabaseKey\"")
 
         // Add Room schema location
         ksp {
@@ -100,8 +108,12 @@ dependencies {
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("androidx.cardview:cardview:1.0.0")
 
+
     // CircleImageView for circular profile images
     implementation("de.hdodenhof:circleimageview:3.1.0")
+
+    // Supabase SDK
+    implementation("io.supabase:supabase-kt:1.5.0")
 
     // Glide for image loading
     implementation("com.github.bumptech.glide:glide:4.16.0")
