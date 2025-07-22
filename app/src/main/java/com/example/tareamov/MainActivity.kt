@@ -7,26 +7,21 @@ import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import com.example.tareamov.viewmodel.AuthViewModel
 import com.example.tareamov.viewmodel.PersonaViewModel
+import com.example.tareamov.viewmodel.SupabaseViewModel
 import com.example.tareamov.data.AppDatabase // Added
 import com.example.tareamov.data.sync.SyncRepository // Added
 
-// Firebase imports
-import com.google.firebase.FirebaseApp
-import com.google.firebase.firestore.FirebaseFirestore
 
 class MainActivity : AppCompatActivity() {
     lateinit var navController: NavController
     lateinit var personaViewModel: PersonaViewModel
     lateinit var authViewModel: AuthViewModel
     lateinit var syncRepository: SyncRepository // Added
+    private lateinit var supabaseViewModel: SupabaseViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        // Inicializar Firebase
-        FirebaseApp.initializeApp(this)
-        val firestore = FirebaseFirestore.getInstance()
 
         // Initialize Database and DAOs
         val appDb = AppDatabase.getDatabase(applicationContext)
@@ -54,9 +49,26 @@ class MainActivity : AppCompatActivity() {
             firestore
         )
 
+
         // Initialize ViewModels
         personaViewModel = ViewModelProvider(this)[PersonaViewModel::class.java]
         authViewModel = ViewModelProvider(this)[AuthViewModel::class.java]
+        supabaseViewModel = ViewModelProvider(this)[SupabaseViewModel::class.java]
+
+        // Ejemplo de uso del SupabaseViewModel para login
+        // Puedes llamar a esta función cuando el usuario intente iniciar sesión
+        // supabaseViewModel.loginConEmail("usuario@email.com", "password")
+
+        // Observa el resultado del login
+        supabaseViewModel.loginResult.observe(this) { token ->
+            if (token != null) {
+                // Login exitoso, puedes guardar el token o navegar a otra pantalla
+                println("Login Supabase exitoso. Token: $token")
+            } else {
+                // Mostrar error de login
+                println("Error en login Supabase")
+            }
+        }
 
         // Set up Navigation - Ensure this is properly initialized
         val navHostFragment = supportFragmentManager
@@ -69,11 +81,6 @@ class MainActivity : AppCompatActivity() {
         // Change start destination to splashFragment to show loading screen
         navGraph.setStartDestination(R.id.splashFragment)
         navController.graph = navGraph
-
-        // Trigger synchronization of local pending data to Firebase.
-        // Ideally, this should be triggered by a network connectivity listener.
-        // When the app starts or network becomes available, check for pending data and sync.
-        syncRepository.syncLocalToFirebase()
 
         // Enviar datos de todas las entidades a Firebase Firestore
         // The following block has been removed to implement a pending sync strategy.
